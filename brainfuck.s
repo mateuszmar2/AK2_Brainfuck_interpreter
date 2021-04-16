@@ -138,10 +138,75 @@ input_value:
     jmp brainfuck_loop_end
 
 left_bracket:                           
+    cmp $0, %edi                        # Jeśli w bieżącej pozycji znajduje się 0
+    je find_right_bracket               # to skacze zaraz za zamykający nawias
+
+# specjalny przypadek dla [-], który zeruje komórkę
+    mov %esi, %eax
+    inc %eax
+    cmpb $'-', CODEBUFF(%eax)
+    jne chceck_zero_end
+    inc %eax
+    cmpb $']', CODEBUFF(%eax)
+    jne chceck_zero_end
+    movb $0, (%edi)
+    add $2, %esi
     jmp brainfuck_loop_end
 
-right_bracket:                           
+chceck_zero_end:
+    push %esi    
     jmp brainfuck_loop_end
+
+find_right_bracket:                                       
+    mov %esi, %ebx
+    mov $0, %edx
+    cmpw $0, JUMPTABLE(%edx, %ebx, 2)   # sprawdza czy prawy nawias znajduje się w JUMPTABLE  
+    jg jump_matching                    # jeśli > 0 czyli istnieje
+
+# jeśli nie istnieje to znajdź
+    mov $0, %ecx                        # wpisz 0 do licznika nawiasów, zlicza on ilość pętli wewnętrznych
+    find_right_bracket_loop:
+        inc %esi                        # przejdź do następnego znaku w kodzie
+        cmpb $'[', CODEBUFF(%esi)       # sprawdź czy to lewy nawias
+        jne check_right
+        inc %ecx                        # inkrementuj licznik ilości pętli wewnętrznych
+        
+        check_right:                    # sprawdź czy to jest prawy nawias
+            cmpb $']', CODEBUFF(%esi)   # sprawdź czy to prawy nawias
+            jne check_right_end         # jeśli nie jest nawiasem zamykającym to idź do końca procedury
+            cmp $0, %ecx                
+            je find_right_bracket_loop_end  # jeśli znaleziono właściwy nawias
+            dec %ecx                    # znaleziono nawias jednej z pętli wewnętrznej więc dekrementuj licznik
+            
+            check_right_end:
+                jmp find_right_bracket_loop  # wróć do początku pętli
+    
+        find_right_bracket_loop_end:
+            mov $0, %edx
+            mov %esi, %eax
+            movw %ax, JUMPTABLE(%edx, %esi, 2)  # dodaj adres prawego nawiasu do JUMPTABLE
+            jmp brainfuck_loop_end              # wróć do głównej pętli
+
+jump_matching:                          # przeskakuje do zamykającego nawiasu
+    mov $0, %edx
+    movw JUMPTABLE(%edx, %ebx, 2), %ax  # przepisz adres zamykającego nawiasu do ax
+    mov %eax, %esi                     # przepisz adres do wskaźnika po kodzie
+    jmp brainfuck_loop_end
+
+
+
+right_bracket:
+    cmpb $0, (%edi)                     # jeżeli nie jest 0 to wróć do lewego nawiasu
+    jne find_left_bracket
+
+# jeśli jest równe 0 to zrzuć jeden nawias otwierający ze stosu
+    add $8, %esp
+    jmp brainfuck_loop_end
+
+    find_left_bracket:
+        mov (%esp), %esi
+        jmp brainfuck_loop_end
+
 
 brainfuck_end:                      # wypisz znak nowej linii i zakończ program
 write $newline, $msg_end_line_len
