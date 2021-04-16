@@ -1,15 +1,14 @@
 # Mateusz Marciniec 252765
-# Bartosz Szymczak 213769
-# Program pyta o kod a następnie go wykonuje
+# Bartosz Szymczak 252734
+# Program pyta o kod w brainfuck'u a następnie go wykonuje
 # Po zrobieniu działającej wersji rozszerzenie o optymalizacje i wczytywanie z pliku
 
-
 SYSCALL32 = 0x80                    # wywołanie systemu operacyjnego
+SYSREAD = 3                         # numer funkcji read
+SYSWRITE = 4                        # numer funkcji write
 SYSEXIT = 1                         # zakończenie procesu
 STDIN = 0                           # standardowe wejście
 STDOUT = 1                          # standardowe wyjście
-SYSREAD = 3                         # numer funkcji read
-SYSWRITE = 4                        # numer funkcji write
 EXIT_SUCCESS = 0                    # kod błędu przy wyjściu
 BUFF_SIZE = 30000                   # Długość bufora
 
@@ -17,23 +16,28 @@ BUFF_SIZE = 30000                   # Długość bufora
 
 # segment danych
 .section .bss                       # część programu zawierająca dane nie zainicjalizowane
-ARRAY:          .skip 30000         # zarezerwowanie w segmencie .bss dla tablicy o rozmiarze 30000, zainicjowana 0
-JUMPTABLE:      .skip 128000
-CODEBUFF: 	    .skip 500000
+ARRAY:          .skip 30000         # zarezerwowanie w segmencie .bss dla tablicy o rozmiarze 30000, wypełniona 0
+JUMPTABLE:      .skip 128000        # bufor potrzebny do wykonywania skoków związanych z pętlami
+CODEBUFF: 	    .skip 500000        # bufor do którego zostanie wklejony kod brainfuck'owy
 
 .section .data                      # część programu zawierająca dane zainicjalizowane
 
 msg_brainfuck:                      # etykieta dla napisu ze znakiem zachęty
-.ascii "Brainfuck> "                # dyrektywa .ascii rezerwuja pamięć na napis                                    
-                
+.ascii "Brainfuck> "                # dyrektywa .ascii rezerwuja pamięć na napis                          
+
 msg_brainfuck_len = . - msg_brainfuck  # długość napisu ze znakiem zachęty
 
 msg_end_line:                       # etykieta dla napisu końca linii
-.ascii "\0 "                         # dyrektywa .ascii rezerwuja pamięć na napis                                    
+.ascii "\0 "                        # dyrektywa .ascii rezerwuja pamięć na napis                                    
                 
 msg_end_line_len = . - msg_end_line  # długość napisu końca linii
 
-text_size: .int 0                   # miejsce na długość wpisanego tekstu
+msg_arg:                            # etykieta dla napisu z zapytaniem o argument
+.ascii "Podaj argument: "           # dyrektywa .ascii rezerwuja pamięć na napis                                    
+                
+msg_arg_len = . - msg_arg           # długość napisu
+
+text_size: .int 0                   # miejsce na długość wpisanego kodu
 
 # segment kodu
 .text
@@ -42,7 +46,7 @@ newline:	.asciz "\n"
 
 _start:
 
-# wypisz string na stdout
+# macro wypisz string na stdout
 # arg1 - adres łańcucha
 # arg2 - długość łańcucha
 .macro write str, str_size
@@ -51,9 +55,9 @@ _start:
  mov \str, %ecx                     # adres początkowy napisu
  mov \str_size, %edx                # długość łańcucha
  int $SYSCALL32                     # wykonanie funcji systemowej.
-.endm 
+.endm                               # koniec makra
 
-# wywołanie makra write w celu wypissania "Brainfuck> "
+# wywołanie makra write w celu wypisania "Brainfuck> "
 write $msg_brainfuck, $msg_brainfuck_len
 
 # wczytanie łańcucha z kodem
@@ -63,10 +67,10 @@ mov $CODEBUFF, %ecx                 # adres początkowy napisu
 mov $BUFF_SIZE, %edx                # długość łańcucha
 int $SYSCALL32                      # wywołanie przerwania programowego
 
-mov %eax, text_size                 # przypisanie rozmiaru tekstu do text_size
-inc %eax
-movzx msg_end_line, %ebx            # dopisz znak końca linii na końcu wyrażenia, nie wiem czy potrzebne
-mov %ebx, ARRAY(%eax)
+# mov %eax, text_size                 # przypisanie rozmiaru tekstu do text_size
+# inc %eax
+# movzx msg_end_line, %ebx            # dopisz znak końca linii na końcu wyrażenia, nie wiem czy potrzebne
+# mov %ebx, ARRAY(%eax)
 
 
 # mov text_size, %ecx                 # przypisanie długości zdania do ecx
@@ -75,7 +79,7 @@ mov %ebx, ARRAY(%eax)
 # kod jest wczytany teraz główna część programu
 brainfuck:
 mov $0, %esi                        # 0 jako bieżący indeks w tablicy z kodem
-mov $ARRAY, %edi                    # bieżący adres w tablicy do EDI
+mov $ARRAY, %edi                    # bieżący adres w tablicy do edi
 
 brainfuck_loop:
     cmpb $'>', CODEBUFF(%esi)
@@ -106,36 +110,36 @@ brainfuck_loop:
 	je	brainfuck_end               # '\0' oznacza że osiągnięto koniec wyrażenia, zakończ program
 
 brainfuck_loop_end:
-    inc %esi
-    jmp brainfuck_loop
+    inc %esi                        # inkrementuj wskaźnik wskazujący na wnętrze buforu z kodem
+    jmp brainfuck_loop              # wróć do głównej pętli programu
 
 inc_pointer:
     inc %edi
-    jmp brainfuck_loop_end
+    jmp brainfuck_loop_end          # skocz do końcówki głównej pętli
 
 dec_pointer:
     dec %edi
-    jmp brainfuck_loop_end
+    jmp brainfuck_loop_end          # skocz do końcówki głównej pętli
 
 inc_value:
     incb (%edi)
-    jmp brainfuck_loop_end
+    jmp brainfuck_loop_end          # skocz do końcówki głównej pętli
 
 dec_value:
     decb (%edi)
-    jmp brainfuck_loop_end
+    jmp brainfuck_loop_end          # skocz do końcówki głównej pętli
 
 output_value:
     write %edi, $1
-    jmp brainfuck_loop_end
+    jmp brainfuck_loop_end          # skocz do końcówki głównej pętli
 
 input_value:
-    mov $SYSREAD, %eax                  # kod funkcji SYSREAD
-    mov $STDIN, %ebx                    # systemowy deskryptor stdin
-    mov %edi, %ecx                      # adres początkowy napisu
-    mov $1, %edx                        # długość łańcucha
-    int $SYSCALL32                      # wywołanie przerwania programowego
-    jmp brainfuck_loop_end
+    mov $SYSREAD, %eax              # kod funkcji SYSREAD
+    mov $STDIN, %ebx                # systemowy deskryptor stdin
+    mov %edi, %ecx                  # adres początkowy napisu
+    mov $1, %edx                    # długość łańcucha
+    int $SYSCALL32                  # wywołanie przerwania programowego
+    jmp brainfuck_loop_end          # skocz do końcówki głównej pętli
 
 left_bracket:                           
     cmp $0, %edi                        # Jeśli w bieżącej pozycji znajduje się 0
