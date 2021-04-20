@@ -18,14 +18,14 @@ SYSWRITE = 4                            # numer funkcji write
 STDIN = 0                               # standardowe wejście
 STDOUT = 1                              # standardowe wyjście
 EXIT_SUCCESS = 0                        # kod błędu przy wyjściu
-BUFF_SIZE = 30000                       # Długość bufora
+BUFF_SIZE = 500000                      # Długość bufora
 
 .global _start
 
 # segment danych
 .section .bss                           # część programu zawierająca dane nie zainicjalizowane
 ARRAY:          .skip 30000             # zarezerwowanie w segmencie .bss dla tablicy o rozmiarze 30000, wypełniona 0
-JUMPTABLE:      .skip 128000            # bufor potrzebny do wykonywania skoków związanych z pętlami
+JUMPTABLE:      .skip 500000            # bufor potrzebny do wykonywania skoków związanych z pętlami
 CODEBUFF: 	    .skip 500000            # bufor do którego zostanie wklejony kod brainfuck'owy
 
 .section .data                          # część programu zawierająca dane zainicjalizowane
@@ -151,7 +151,7 @@ input_value:
     jmp brainfuck_loop_end              # skocz do końcówki głównej pętli
 
 left_bracket:                           
-    cmp $0, %edi                        # Jeśli w bieżącej pozycji znajduje się 0
+    cmpb $0, (%edi)                     # Jeśli w bieżącej pozycji znajduje się 0
     je find_right_bracket               # to skacze zaraz za zamykający nawias
 
 # specjalny przypadek dla [-], który zeruje komórkę
@@ -172,8 +172,8 @@ chceck_zero_end:                        # wiemy że nie jest to szczególny przy
 
 find_right_bracket:                                       
     mov %esi, %ebx
-    mov $0, %edx
-    cmpw $0, JUMPTABLE(%edx, %ebx, 2)   # sprawdza czy prawy nawias znajduje się w JUMPTABLE  
+    # mov $0, %edx
+    cmpw $0, JUMPTABLE(, %ebx, 2)       # sprawdza czy prawy nawias znajduje się w JUMPTABLE  
     jg jump_matching                    # jeśli > 0 czyli istnieje
 
 # jeśli nie istnieje to znajdź
@@ -195,14 +195,14 @@ find_right_bracket:
                 jmp find_right_bracket_loop  # wróć do początku pętli szukającej zamykającego nawiasu
     
         find_right_bracket_loop_end:
-            mov $0, %edx
+           # mov $0, %edx
             mov %esi, %eax
-            movw %ax, JUMPTABLE(%edx, %esi, 2)  # dodaj adres prawego nawiasu do JUMPTABLE
-            jmp brainfuck_loop_end              # wróć do głównej pętli
+            movw %ax, JUMPTABLE(, %ebx, 2)  # dodaj adres prawego nawiasu do JUMPTABLE
+            jmp brainfuck_loop_end          # wróć do głównej pętli
 
 jump_matching:                          # przeskakuje do zamykającego nawiasu
-    mov $0, %edx
-    movw JUMPTABLE(%edx, %ebx, 2), %ax  # przepisz adres zamykającego nawiasu do ax
+    # mov $0, %edx
+    movw JUMPTABLE(, %ebx, 2), %ax      # przepisz adres zamykającego nawiasu do ax
     mov %eax, %esi                      # przepisz adres do wskaźnika po kodzie
     jmp brainfuck_loop_end
 
@@ -213,7 +213,7 @@ right_bracket:
     jne find_left_bracket
 
 # jeśli jest równe 0 to zrzuć jeden nawias otwierający ze stosu
-    add $8, %esp
+    add $4, %esp
     jmp brainfuck_loop_end
 
     find_left_bracket:                  # pobieramy lewy nawias
@@ -226,7 +226,3 @@ write $newline, $msg_end_line_len
 mov $SYSEXIT, %eax                      # funkcja do wywołania - SYSEXIT
 mov $EXIT_SUCCESS, %ebx                 # odpowiedni kod podawany na wyjściu
 int $SYSCALL32                          # przerwanie systemowe
-
-
-
-
