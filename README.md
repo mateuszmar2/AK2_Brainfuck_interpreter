@@ -1,3 +1,7 @@
-# AK2 Project
+# AK2 Projekt
 
-Brainfuck compiler or interpreter, we will see
+Interpreter języka brainfuck napisany w **32-bitowym** języku assemblera w składni **AT&T**
+
+#### Autorzy
+* Mateusz Marciniec
+* Bartosz Szymczak
