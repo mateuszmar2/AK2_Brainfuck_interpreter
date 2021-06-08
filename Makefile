@@ -1,9 +1,6 @@
-run_brainfuck: brainfuck
-
-brainfuck: brainfuck.o
-	ld brainfuck.o -o brainfuck -m elf_i386
-	./brainfuck
-
-brainfuck.o: brainfuck.s
+brainfuck: brainfuck.s
 	clear
-	as brainfuck.s -o brainfuck.o --32 -g
+	gcc brainfuck.s -o brainfuck -m32
+
+clean:
+	rm -f brainfuck
